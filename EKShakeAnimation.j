@@ -20,12 +20,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+@import <Foundation/Foundation.j>
+@import <AppKit/CPViewAnimation.j>
+
+var currentAnimatedView = [];
+
 @implementation EKShakeAnimation : CPObject
 {
     id      target;
     int     currentStep;
     int     delta;
-    CG      targetFrame;
+    CGRect  targetFrame;
     int     steps;
     float   stepDuration;
     CPTimer timer;
@@ -33,28 +38,34 @@ THE SOFTWARE.
 
 - (id)initWithView:(id)aView
 {
-    if(self = [super init])
+    if (self = [super init])
     {
-        target       = aView;
-        targetFrame  = [target frame];
-        currentStep  = 1;
-        delta        = 7;
-        steps        = 5;
-        stepDuration = 0.07;
-        timer        = [CPTimer scheduledTimerWithTimeInterval:stepDuration target:self selector:@selector(timerDidFire) userInfo:nil repeats:YES];
-        
-        [timer fire];    
+        if ([currentAnimatedView indexOfObject:aView] == CPNotFound)
+        {
+            target       = aView;
+            targetFrame  = CGRectMakeCopy([target frame]);
+            currentStep  = 1;
+            delta        = 7;
+            steps        = 5;
+            stepDuration = 0.07;
+            timer        = [CPTimer scheduledTimerWithTimeInterval:stepDuration target:self selector:@selector(timerDidFire) userInfo:nil repeats:YES];
+
+            [timer fire];
+        }
+
     }
-    
+
     return self;
 }
 
 - (void)timerDidFire
 {
+    [currentAnimatedView addObject:target];
+
     if (currentStep === steps)
     {
         [timer invalidate];
-        
+
         setTimeout(function()
         {
             [self animateToFrame:targetFrame];
@@ -64,7 +75,7 @@ THE SOFTWARE.
     {
         var prefix = (currentStep % 2 === 1) ? -1 : 1;
 
-        [self animateToFrame:CGRectMake(targetFrame.origin.x + delta * prefix, 
+        [self animateToFrame:CGRectMake(targetFrame.origin.x + delta * prefix,
                                         targetFrame.origin.y,
                                         targetFrame.size.width,
                                         targetFrame.size.height)];
@@ -77,15 +88,22 @@ THE SOFTWARE.
 {
     var animation = [[CPViewAnimation alloc] initWithViewAnimations:[
         [CPDictionary dictionaryWithJSObject:{
-            CPViewAnimationTargetKey:target, 
+            CPViewAnimationTargetKey:target,
             CPViewAnimationStartFrameKey:targetFrame,
             CPViewAnimationEndFrameKey:aFrame
-        }]
-    ]];
+        }]]];
+
     [animation setAnimationCurve:CPAnimationLinear];
     [animation setDuration:stepDuration];
+    [animation setDelegate:self];
     [animation startAnimation];
     targetFrame = aFrame;
+}
+
+- (void)animationDidEnd:(CPAnimation)animation
+{
+    if (![timer isValid])
+        [currentAnimatedView removeObject:target];
 }
 
 @end
